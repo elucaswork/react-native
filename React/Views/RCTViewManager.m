@@ -46,6 +46,7 @@ RCT_MULTI_ENUM_CONVERTER(UIAccessibilityTraits, (@{
   @"adjustable": @(UIAccessibilityTraitAdjustable),
   @"allowsDirectInteraction": @(UIAccessibilityTraitAllowsDirectInteraction),
   @"pageTurn": @(UIAccessibilityTraitCausesPageTurn),
+  @"switch": @(UIAccessibilityTraitNone),
 }), UIAccessibilityTraitNone, unsignedLongLongValue)
 
 @end
@@ -53,6 +54,7 @@ RCT_MULTI_ENUM_CONVERTER(UIAccessibilityTraits, (@{
 @implementation RCTViewManager
 
 @synthesize bridge = _bridge;
+@synthesize a11ySwitch = _a11ySwitch;
 
 RCT_EXPORT_MODULE()
 
@@ -110,6 +112,7 @@ RCT_REMAP_VIEW_PROPERTY(accessible, reactAccessibilityElement.isAccessibilityEle
 RCT_REMAP_VIEW_PROPERTY(accessibilityActions, reactAccessibilityElement.accessibilityActions, NSArray<NSString *>)
 RCT_REMAP_VIEW_PROPERTY(accessibilityLabel, reactAccessibilityElement.accessibilityLabel, NSString)
 RCT_REMAP_VIEW_PROPERTY(accessibilityHint, reactAccessibilityElement.accessibilityHint, NSString)
+RCT_REMAP_VIEW_PROPERTY(accessibilityValue, reactAccessibilityElement.accessibilityValue, NSString)
 RCT_REMAP_VIEW_PROPERTY(accessibilityTraits, reactAccessibilityElement.accessibilityTraits, UIAccessibilityTraits)
 RCT_REMAP_VIEW_PROPERTY(accessibilityViewIsModal, reactAccessibilityElement.accessibilityViewIsModal, BOOL)
 RCT_REMAP_VIEW_PROPERTY(accessibilityElementsHidden, reactAccessibilityElement.accessibilityElementsHidden, BOOL)
@@ -156,7 +159,15 @@ RCT_CUSTOM_VIEW_PROPERTY(accessibilityRole, UIAccessibilityTraits, RCTView)
 
   UIAccessibilityTraits newTraits = json ? [RCTConvert UIAccessibilityTraits:json] : defaultView.accessibilityTraits;
   UIAccessibilityTraits maskedTraits = newTraits & AccessibilityRolesMask;
-  view.reactAccessibilityElement.accessibilityTraits = (view.reactAccessibilityElement.accessibilityTraits & ~AccessibilityRolesMask) | maskedTraits;
+
+  if ([json isEqualToString:@"switch"]) {
+    // UIKit doesn't expose a switch trait UIAccessibilityTraits, even though it's used by Apple on UISwitch view.
+    // Thus, to make the switch trait work, it needs to copy the accessibilityTraits from an UISwitch istance
+    _a11ySwitch = [UISwitch new];
+    view.reactAccessibilityElement.accessibilityTraits = [_a11ySwitch accessibilityTraits];
+  } else {
+    view.reactAccessibilityElement.accessibilityTraits = (view.reactAccessibilityElement.accessibilityTraits & ~AccessibilityRolesMask) | maskedTraits;
+  }
 }
 
 RCT_CUSTOM_VIEW_PROPERTY(accessibilityStates, UIAccessibilityTraits, RCTView)
@@ -166,7 +177,15 @@ RCT_CUSTOM_VIEW_PROPERTY(accessibilityStates, UIAccessibilityTraits, RCTView)
 
   UIAccessibilityTraits newTraits = json ? [RCTConvert UIAccessibilityTraits:json] : defaultView.accessibilityTraits;
   UIAccessibilityTraits maskedTraits = newTraits & AccessibilityStatesMask;
-  view.reactAccessibilityElement.accessibilityTraits = (view.reactAccessibilityElement.accessibilityTraits & ~AccessibilityStatesMask) | maskedTraits;
+
+  if (view.reactAccessibilityElement.accessibilityTraits == [_a11ySwitch accessibilityTraits] && newTraits != UIAccessibilityTraitNotEnabled) {
+    BOOL isOn = newTraits == UIAccessibilityTraitSelected;
+    [_a11ySwitch setOn:isOn];
+    // It has to be a 0 or 1, otherwise VoiceOver won't read "on" or "off" state
+    view.reactAccessibilityElement.accessibilityValue = isOn ? @"1" : @"0";
+  } else {
+    view.reactAccessibilityElement.accessibilityTraits = (view.reactAccessibilityElement.accessibilityTraits & ~AccessibilityStatesMask) | maskedTraits;
+  }
 }
 
 RCT_CUSTOM_VIEW_PROPERTY(nativeID, NSString *, RCTView)

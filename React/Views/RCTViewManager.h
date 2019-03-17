@@ -30,6 +30,10 @@ typedef void (^RCTViewManagerUIBlock)(RCTUIManager *uiManager, NSDictionary<NSNu
  */
 @property (nonatomic, weak) RCTBridge *bridge;
 
+// This property will be used to copy the accessibilityTraits from an UISwitch
+// in order to have a switch accessibilityRole
+@property (nullable, nonatomic, strong) UISwitch *a11ySwitch;
+
 /**
  * This method instantiates a native view to be managed by the module. Override
  * this to return a custom view instance, which may be preconfigured with default
